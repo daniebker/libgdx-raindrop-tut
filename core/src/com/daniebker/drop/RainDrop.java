@@ -35,7 +35,7 @@ public class RainDrop implements Pool.Poolable{
     }
 
     public void update(float delta) {
-        position.y -= 200 * Gdx.graphics.getDeltaTime();
+        position.y -= 200 * delta;
         boundingBox.setPosition(position.x, position.y);
     }
 }

@@ -80,9 +80,9 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         update();
         draw();
-        processInput();
+        processInput(delta);
         updateGame();
-        processPhysics();
+        processPhysics(delta);
     }
 
     private void updateGame() {
@@ -92,14 +92,14 @@ public class GameScreen implements Screen {
         }
     }
 
-    private void processPhysics() {
+    private void processPhysics(float delta) {
         // move the raindrops, remove any that are beneath the bottom edge of
         // the screen or that hit the bucket. In the later case we increase the
         // value our drops counter and add a sound effect.
         Iterator<RainDrop> iter = raindrops.iterator();
         while (iter.hasNext()) {
             RainDrop raindrop = iter.next();
-            raindrop.update(Gdx.graphics.getDeltaTime());
+            raindrop.update(delta);
             if (raindrop.position.y + 64 < 0) {
                 iter.remove();
                 rainDropPool.free(raindrop);
@@ -113,7 +113,7 @@ public class GameScreen implements Screen {
         }
     }
 
-    private void processInput() {
+    private void processInput(float delta) {
         // process user input
         if (Gdx.input.isTouched()) {
             Vector3 touchPos = new Vector3();
@@ -122,9 +122,9 @@ public class GameScreen implements Screen {
             bucket.x = touchPos.x - 64 / 2;
         }
         if (Gdx.input.isKeyPressed(Keys.LEFT))
-            bucket.x -= 200 * Gdx.graphics.getDeltaTime();
+            bucket.x -= 200 * delta;
         if (Gdx.input.isKeyPressed(Keys.RIGHT))
-            bucket.x += 200 * Gdx.graphics.getDeltaTime();
+            bucket.x += 200 * delta;
 
         // make sure the bucket stays within the screen bounds
         if (bucket.x < 0)
