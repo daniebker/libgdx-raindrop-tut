@@ -3,6 +3,7 @@ package com.daniebker.drop;
 import java.util.Iterator;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
@@ -31,7 +32,6 @@ public class GameScreen implements Screen {
     long lastDropTime;
     int dropsGathered;
 
-    // bullet pool.
     private final Pool<RainDrop> rainDropPool = new Pool<RainDrop>() {
         @Override
         protected RainDrop newObject() {
@@ -70,12 +70,6 @@ public class GameScreen implements Screen {
     }
 
     private void spawnRaindrop() {
-       /* Rectangle raindrop = new Rectangle();
-        raindrop.x = MathUtils.random(0, 800 - 64);
-        raindrop.y = 480;*/
-     /*   raindrop.width = 64;
-        raindrop.height = 64;*/
-        // if you want to spawn a new bullet:
         RainDrop item = rainDropPool.obtain();
         item.init();
         raindrops.add(item);
@@ -84,29 +78,42 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        // clear the screen with a dark blue color. The
-        // arguments to clear are the red, green
-        // blue and alpha component in the range [0,1]
-        // of the color to be used to clear the screen.
-        ScreenUtils.clear(0, 0, 0.2f, 1);
+        update();
+        draw();
+        processInput();
+        updateGame();
+        processPhysics();
+    }
 
-        // tell the camera to update its matrices.
-        camera.update();
-
-        // tell the SpriteBatch to render in the
-        // coordinate system specified by the camera.
-        game.batch.setProjectionMatrix(camera.combined);
-
-        // begin a new batch and draw the bucket and
-        // all drops
-        game.batch.begin();
-        game.font.draw(game.batch, "Drops Collected: " + dropsGathered, 0, 480);
-        game.batch.draw(bucketImage, bucket.x, bucket.y, bucket.width, bucket.height);
-        for (RainDrop raindrop : raindrops) {
-            game.batch.draw(dropImage, raindrop.position.x, raindrop.position.y);
+    private void updateGame() {
+        // check if we need to create a new raindrop
+        if (TimeUtils.nanoTime() - lastDropTime > 1000000000) {
+            spawnRaindrop();
         }
-        game.batch.end();
+    }
 
+    private void processPhysics() {
+        // move the raindrops, remove any that are beneath the bottom edge of
+        // the screen or that hit the bucket. In the later case we increase the
+        // value our drops counter and add a sound effect.
+        Iterator<RainDrop> iter = raindrops.iterator();
+        while (iter.hasNext()) {
+            RainDrop raindrop = iter.next();
+            raindrop.update(Gdx.graphics.getDeltaTime());
+            if (raindrop.position.y + 64 < 0) {
+                iter.remove();
+                rainDropPool.free(raindrop);
+            }
+            if (raindrop.boundingBox.overlaps(bucket)) {
+                dropsGathered++;
+                dropSound.play();
+                iter.remove();
+                rainDropPool.free((raindrop));
+            }
+        }
+    }
+
+    private void processInput() {
         // process user input
         if (Gdx.input.isTouched()) {
             Vector3 touchPos = new Vector3();
@@ -124,30 +131,33 @@ public class GameScreen implements Screen {
             bucket.x = 0;
         if (bucket.x > 800 - 64)
             bucket.x = 800 - 64;
+    }
 
-        // check if we need to create a new raindrop
-        if (TimeUtils.nanoTime() - lastDropTime > 1000000000)
-            spawnRaindrop();
-
-        // move the raindrops, remove any that are beneath the bottom edge of
-        // the screen or that hit the bucket. In the later case we increase the
-        // value our drops counter and add a sound effect.
-        Iterator<RainDrop> iter = raindrops.iterator();
-        while (iter.hasNext()) {
-            RainDrop raindrop = iter.next();
-            raindrop.update(Gdx.graphics.getDeltaTime());
-           /* raindrop.position.y -= 200 * Gdx.graphics.getDeltaTime();*/
-            if (raindrop.position.y + 64 < 0) {
-                iter.remove();
-                rainDropPool.free(raindrop);
-            }
-            if (raindrop.boundingBox.overlaps(bucket)) {
-                dropsGathered++;
-                dropSound.play();
-                iter.remove();
-                rainDropPool.free((raindrop));
-            }
+    private void draw() {
+        // begin a new batch and draw the bucket and
+        // all drops
+        game.batch.begin();
+        game.font.draw(game.batch, "Drops Collected: " + dropsGathered, 0, 480);
+        game.batch.draw(bucketImage, bucket.x, bucket.y, bucket.width, bucket.height);
+        for (RainDrop raindrop : raindrops) {
+            game.batch.draw(dropImage, raindrop.position.x, raindrop.position.y);
         }
+        game.batch.end();
+    }
+
+    private void update() {
+        // clear the screen with a dark blue color. The
+        // arguments to clear are the red, green
+        // blue and alpha component in the range [0,1]
+        // of the color to be used to clear the screen.
+        ScreenUtils.clear(0, 0, 0.2f, 1);
+
+        // tell the camera to update its matrices.
+        camera.update();
+
+        // tell the SpriteBatch to render in the
+        // coordinate system specified by the camera.
+        game.batch.setProjectionMatrix(camera.combined);
     }
 
     @Override
