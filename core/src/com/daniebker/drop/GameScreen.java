@@ -1,23 +1,19 @@
 package com.daniebker.drop;
 
-import java.util.Iterator;
-
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Pool;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.TimeUtils;
-import com.daniebker.drop.Drop;
+
+import java.util.Iterator;
 
 public class GameScreen implements Screen {
     final Drop game;
@@ -27,8 +23,8 @@ public class GameScreen implements Screen {
     Sound dropSound;
     Music rainMusic;
     OrthographicCamera camera;
-    Rectangle bucket;
     Array<RainDrop> raindrops;
+    Player player;
     long lastDropTime;
     int dropsGathered;
 
@@ -55,16 +51,10 @@ public class GameScreen implements Screen {
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 800, 480);
 
-        // create a Rectangle to logically represent the bucket
-        bucket = new Rectangle();
-        bucket.x = 800 / 2 - 64 / 2; // center the bucket horizontally
-        bucket.y = 20; // bottom left corner of the bucket is 20 pixels above
-        // the bottom screen edge
-        bucket.width = 64;
-        bucket.height = 64;
+        player = new Player();
+        player.init();
 
-        // create the raindrops array and spawn the first raindrop
-        raindrops = new Array<RainDrop>();
+        raindrops = new Array<>();
         spawnRaindrop();
 
     }
@@ -78,33 +68,31 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        update();
+        update(delta);
         draw();
         processInput(delta);
         updateGame();
-        processPhysics(delta);
+        processPhysics();
     }
 
     private void updateGame() {
-        // check if we need to create a new raindrop
         if (TimeUtils.nanoTime() - lastDropTime > 1000000000) {
             spawnRaindrop();
         }
     }
 
-    private void processPhysics(float delta) {
+    private void processPhysics() {
         // move the raindrops, remove any that are beneath the bottom edge of
         // the screen or that hit the bucket. In the later case we increase the
         // value our drops counter and add a sound effect.
         Iterator<RainDrop> iter = raindrops.iterator();
         while (iter.hasNext()) {
             RainDrop raindrop = iter.next();
-            raindrop.update(delta);
             if (raindrop.position.y + 64 < 0) {
                 iter.remove();
                 rainDropPool.free(raindrop);
             }
-            if (raindrop.boundingBox.overlaps(bucket)) {
+            if (raindrop.boundingBox.overlaps(player.getBoundingBox())) {
                 dropsGathered++;
                 dropSound.play();
                 iter.remove();
@@ -114,38 +102,31 @@ public class GameScreen implements Screen {
     }
 
     private void processInput(float delta) {
-        // process user input
         if (Gdx.input.isTouched()) {
             Vector3 touchPos = new Vector3();
             touchPos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
             camera.unproject(touchPos);
-            bucket.x = touchPos.x - 64 / 2;
+            player.setPosition(touchPos.x, player.getPosition().y);
         }
-        if (Gdx.input.isKeyPressed(Keys.LEFT))
-            bucket.x -= 200 * delta;
-        if (Gdx.input.isKeyPressed(Keys.RIGHT))
-            bucket.x += 200 * delta;
-
-        // make sure the bucket stays within the screen bounds
-        if (bucket.x < 0)
-            bucket.x = 0;
-        if (bucket.x > 800 - 64)
-            bucket.x = 800 - 64;
+        if (Gdx.input.isKeyPressed(Keys.LEFT)) {
+            player.setPosition(player.getPosition().x -= 200 * delta, player.getPosition().y);
+        }
+        if (Gdx.input.isKeyPressed(Keys.RIGHT)){
+            player.setPosition(player.getPosition().x += 200 * delta, player.getPosition().y);
+        }
     }
 
     private void draw() {
-        // begin a new batch and draw the bucket and
-        // all drops
         game.batch.begin();
         game.font.draw(game.batch, "Drops Collected: " + dropsGathered, 0, 480);
-        game.batch.draw(bucketImage, bucket.x, bucket.y, bucket.width, bucket.height);
+        game.batch.draw(bucketImage, player.getPosition().x, player.getPosition().y, player.getWidth(), player.getHeight());
         for (RainDrop raindrop : raindrops) {
             game.batch.draw(dropImage, raindrop.position.x, raindrop.position.y);
         }
         game.batch.end();
     }
 
-    private void update() {
+    private void update(float delta) {
         // clear the screen with a dark blue color. The
         // arguments to clear are the red, green
         // blue and alpha component in the range [0,1]
@@ -154,7 +135,12 @@ public class GameScreen implements Screen {
 
         // tell the camera to update its matrices.
         camera.update();
-
+        player.update(delta);
+        Iterator<RainDrop> iter = raindrops.iterator();
+        while (iter.hasNext()) {
+            RainDrop raindrop = iter.next();
+            raindrop.update(delta);
+        }
         // tell the SpriteBatch to render in the
         // coordinate system specified by the camera.
         game.batch.setProjectionMatrix(camera.combined);
